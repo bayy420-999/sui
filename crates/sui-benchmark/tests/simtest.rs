@@ -206,5 +206,7 @@ mod test {
             .unwrap();
 
         assert_eq!(benchmark_stats.num_error, 0);
+
+        tracing::info!("end of test {:?}", stats);
     }
 }

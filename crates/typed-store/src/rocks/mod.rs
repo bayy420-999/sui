@@ -32,7 +32,7 @@ use tracing::{debug, error, info, instrument};
 
 use self::{iter::Iter, keys::Keys, values::Values};
 pub use errors::TypedStoreError;
-use sui_macros::nondeterministic;
+use sui_macros::{maybe_kill_node, nondeterministic};
 
 // Write buffer size per RocksDB instance can be set via the env var below.
 // If the env var is not set, use the default value in MiB.
@@ -964,6 +964,9 @@ impl DBBatch {
     /// Consume the batch and write its operations to the database
     #[instrument(level = "trace", skip_all, err)]
     pub fn write(self) -> Result<(), TypedStoreError> {
+        // in simulator ONLY, kill current node every 1/1000 writes.
+        maybe_kill_node!(0.001);
+
         let report_metrics = if self.write_sample_interval.sample() {
             let db_name = self.rocksdb.db_name();
             let timer = self

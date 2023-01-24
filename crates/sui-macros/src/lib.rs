@@ -21,3 +21,18 @@ macro_rules! nondeterministic {
         $expr
     };
 }
+
+#[macro_export]
+macro_rules! maybe_kill_node {
+    ($probability: expr) => {
+        #[cfg(msim)]
+        {
+            let probability: f64 = $probability;
+
+            use rand::Rng;
+            if msim::rand::thread_rng().gen_range(0.0..1.0) < probability {
+                msim::task::kill_current_node(None);
+            }
+        }
+    };
+}

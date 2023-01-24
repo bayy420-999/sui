@@ -10219,6 +10219,7 @@ dependencies = [
  "eyre",
  "fdlimit",
  "hdrhistogram",
+ "msim",
  "num_cpus",
  "once_cell",
  "ouroboros 0.15.5",
