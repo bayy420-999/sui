@@ -1,12 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(msim)]
+//#[cfg(msim)]
 mod test {
 
+    use rand::{thread_rng, Rng};
     use std::str::FromStr;
-    use std::sync::Arc;
-    use std::time::Duration;
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
     use sui_benchmark::util::generate_all_gas_for_test;
     use sui_benchmark::workloads::delegation::DelegationWorkload;
     use sui_benchmark::workloads::shared_counter::SharedCounterWorkload;
@@ -19,7 +20,7 @@ mod test {
         LocalValidatorAggregatorProxy, ValidatorProxy,
     };
     use sui_config::SUI_KEYSTORE_FILENAME;
-    use sui_macros::sim_test;
+    use sui_macros::{register_fail_points, sim_test};
     use sui_simulator::{configs::*, SimConfig};
     use sui_types::object::Owner;
     use test_utils::messages::get_sui_gas_object_with_wallet_context;
@@ -82,6 +83,51 @@ mod test {
             .with_kill_interval_secs(5, 15)
             .with_restart_delay_secs(1, 10);
         node_restarter.run();
+        test_simulated_load(test_cluster, 120).await;
+    }
+
+    #[sim_test(config = "test_config()")]
+    async fn test_simulated_load_reconfig_crashes() {
+        let test_cluster = build_test_cluster(4, 10).await;
+
+        struct DeadValidator {
+            node_id: sui_simulator::task::NodeId,
+            dead_until: std::time::Instant,
+        }
+        let dead_validator: Arc<Mutex<Option<DeadValidator>>> = Default::default();
+
+        register_fail_points(
+            &["batch-write", "transaction-commit", "put-cf"],
+            move || {
+                let mut dead_validator = dead_validator.lock().unwrap();
+                let cur_node = sui_simulator::runtime::NodeHandle::current().id();
+
+                // do not fail multiple nodes at a time.
+                if let Some(dead) = &*dead_validator {
+                    if dead.node_id != cur_node {
+                        return;
+                    }
+                }
+
+                // otherwise, possibly fail the current node
+                let mut rng = thread_rng();
+                if rng.gen_range(0.0..1.0) < 0.01 {
+                    let restart_after = Duration::from_millis(rng.gen_range(10000..20000));
+
+                    *dead_validator = Some(DeadValidator {
+                        node_id: cur_node,
+                        dead_until: Instant::now() + restart_after,
+                    });
+
+                    // must manually release lock before calling kill_current_node, which panics
+                    // and would poison the lock.
+                    drop(dead_validator);
+
+                    sui_simulator::task::kill_current_node(Some(restart_after));
+                }
+            },
+        );
+
         test_simulated_load(test_cluster, 120).await;
     }
 
@@ -207,6 +253,6 @@ mod test {
 
         assert_eq!(benchmark_stats.num_error, 0);
 
-        tracing::info!("end of test {:?}", stats);
+        tracing::info!("end of test {:?}", benchmark_stats);
     }
 }
