@@ -57,11 +57,7 @@ class Setup:
         workers = int(tmp.group(1)) if tmp is not None else 1
 
         tmp = search(r'Collocate primary and workers: (True|False)', raw)
-        if tmp is not None:
-            collocate = 'True' == tmp.group(1)
-        else:
-            collocate = 'True'
-
+        collocate = tmp.group(1) == 'True' if tmp is not None else 'True'
         rate = int(search(r'Input rate: (\d+)', raw).group(1))
         tx_size = int(search(r'Transaction size: (\d+)', raw).group(1))
         return cls(faults, nodes, workers, collocate, rate, tx_size)
@@ -205,10 +201,7 @@ class LogAggregator:
 
 @ticker.FuncFormatter
 def default_major_formatter(x, pos):
-    if x >= 1_000:
-        return f'{x/1000:.0f}k'
-    else:
-        return f'{x:.0f}'
+    return f'{x / 1000:.0f}k' if x >= 1_000 else f'{x:.0f}'
 
 
 def sec_major_formatter(x, pos):
@@ -340,17 +333,7 @@ class Ploter:
         self.results = []
         for f in faults:
             for x in iterator:
-                filename = (
-                    f'{system}.'
-                    f'latency-'
-                    f'{f}-'
-                    f'{x if not scalability else nodes[0]}-'
-                    f'{x if scalability else workers[0]}-'
-                    f'{collocate}-'
-                    f'any-'
-                    f'{tx_size}-'
-                    f'any.txt'
-                )
+                filename = f'{system}.latency-{f}-{nodes[0] if scalability else x}-{x if scalability else workers[0]}-{collocate}-any-{tx_size}-any.txt'
                 if os.path.isfile(filename):
                     with open(filename, 'r') as file:
                         self.results += [file.read().replace(',', '')]
@@ -382,17 +365,7 @@ class Ploter:
         self.results = []
         for f in faults:
             for latency in max_latencies:
-                filename = (
-                    f'{system}.'
-                    f'tps-'
-                    f'{f}-'
-                    f'{"x" if not scalability else nodes[0]}-'
-                    f'{"x" if scalability else workers[0]}-'
-                    f'{collocate}-'
-                    f'any-'
-                    f'{tx_size}-'
-                    f'{latency}.txt'
-                )
+                filename = f'{system}.tps-{f}-{nodes[0] if scalability else "x"}-{"x" if scalability else workers[0]}-{collocate}-any-{tx_size}-{latency}.txt'
                 if os.path.isfile(filename):
                     with open(filename, 'r') as file:
                         self.results += [file.read().replace(',', '')]
