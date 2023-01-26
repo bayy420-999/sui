@@ -1,5 +1,11 @@
 # @mysten/sui.js
 
+## 0.24.1
+
+### Patch Changes
+
+- 72481e759: Updated to new dev inspect transaction layout
+
 ## 0.24.0
 
 ### Minor Changes
